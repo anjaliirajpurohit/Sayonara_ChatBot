@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sayonara AI Assistant (RAG Enabled)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Use Lucide for clean icons (loaded globally)
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            background-color: #f0f4f8;
+        }
+        #chat-log {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+        }
+        #chat-log::-webkit-scrollbar {
+            width: 8px;
+        }
+        #chat-log::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
+        }
+        /* Custom spinner for loading state */
+        .loading-dot {
+            animation: bounce 0.6s infinite alternate;
+        }
+        .loading-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .loading-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-5px); }
+        }
+        /* Style for bot messages to render markdown */
+        .bot-markdown p, .bot-markdown ul, .bot-markdown ol {
+            margin-bottom: 0.5rem;
+        }
+        .bot-markdown ul {
+            list-style-type: disc;
+            padding-left: 1.5rem;
+        }
+        .bot-markdown ol {
+            list-style-type: decimal;
+            padding-left: 1.5rem;
+        }
+        .bot-markdown strong {
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div id="chat-container" class="w-full max-w-2xl bg-white shadow-2xl rounded-xl flex flex-col h-[90vh]">
+        
+        <header class="p-4 border-b border-gray-200 flex items-center justify-between">
+            <h1 class="text-xl font-bold text-gray-800">Sayonara Chatbot</h1>
+            <div class="flex items-center space-x-2 text-sm text-green-600">
+                <i data-lucide="brain-circuit" class="w-5 h-5"></i>
+                <span class="font-medium">Gemini 2.5 Flash + RAG</span>
+            </div>
+        </header>
+
+        <div id="chat-log" class="flex-grow p-4 space-y-4 overflow-y-auto">
+            </div>
+        
+        <div class="p-4 border-t border-gray-200">
+            <div id="status-message" class="text-sm text-red-600 mb-2 hidden"></div>
+            <div class="flex space-x-2">
+                <input type="text" id="user-input" placeholder="Ask about the Sayonara project (e.g., 'What are the UVPs?')"
+                    class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                    autofocus>
+                <button id="send-button"
+                    class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition duration-150 disabled:bg-blue-300 flex items-center justify-center">
+                    <i data-lucide="send" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_SERVER_URL = 'http://localhost:3001/api/chat'; // Must match server.js port 3001
+
+        // --- UI Elements and Helper Functions ---
+        const chatLog = document.getElementById('chat-log');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const statusMessageDiv = document.getElementById('status-message');
+
+        let chatHistory = [];
+
+        // Simple Markdown to HTML converter (for basic formatting like **bold** and lists)
+        function convertMarkdownToHtml(markdownText) {
+            let html = markdownText || "";
+            // Convert bold
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            // Convert lists (simple approach for * or - at start of line)
+            html = html.replace(/^- (.*)$/gm, '<li>$1</li>');
+            html = html.replace(/\* (.*)$/gm, '<li>$1</li>');
+            
+            // Wrap list items in <ul> or <ol> tags
+            const listRegex = /(?:<br>|^)(?:\s*<li>.*<\/li>(?:<br>)?)+/g;
+            html = html.replace(listRegex, match => {
+                // If the list starts with a number, treat it as an ordered list (imperfect but helps)
+                if (match.trim().startsWith('1.') || match.trim().startsWith('2.')) {
+                    return `<ol>${match.replace(/<br>/g, '')}</ol><br>`;
+                }
+                return `<ul>${match.replace(/<br>/g, '')}</ul><br>`;
+            });
+
+            // Convert newlines to breaks
+            html = html.replace(/\n/g, '<br>');
+
+            return `<div class="bot-markdown">${html}</div>`;
+        }
+
+
+        /**
+         * Creates a loading placeholder element for the bot's "typing" status.
+         * @returns {HTMLElement} The loading div element.
+         */
+        function createLoadingIndicator() {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message bot-message flex items-center space-x-1 bg-gray-100 text-gray-700 rounded-xl rounded-tl-sm p-3 max-w-lg shadow-md';
+            loadingDiv.id = 'loading-indicator';
+            
+            ['dot-1', 'dot-2', 'dot-3'].forEach((id) => {
+                const dot = document.createElement('div');
+                dot.className = 'loading-dot w-2 h-2 bg-gray-500 rounded-full';
+                loadingDiv.appendChild(dot);
+            });
+            return loadingDiv;
+        }
+
+        /**
+         * Appends a message to the chat log.
+         * @param {'user' | 'bot'} sender - The sender of the message.
+         * @param {string} text - The content of the message.
+         * @returns {HTMLElement} The created message element.
+         */
+        function appendMessage(sender, text) {
+            const isBot = sender === 'bot';
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `max-w-[90%] p-3 rounded-xl shadow-md transition-all duration-300`;
+            
+            if (isBot) {
+                messageDiv.className += ' self-start bg-gray-100 text-gray-800 rounded-tl-sm';
+                messageDiv.innerHTML = convertMarkdownToHtml(text);
+            } else {
+                messageDiv.className += ' self-end bg-blue-600 text-white rounded-br-sm';
+                messageDiv.innerHTML = text.replace(/\n/g, '<br>');
+            }
+            
+            const wrapper = document.createElement('div');
+            wrapper.className = isBot ? 'flex justify-start' : 'flex justify-end';
+            wrapper.appendChild(messageDiv);
+
+            chatLog.appendChild(wrapper);
+            chatLog.scrollTop = chatLog.scrollHeight;
+            return messageDiv;
+        }
+
+        /**
+         * Main function to handle sending a user message.
+         */
+        async function handleChat() {
+            const userMessage = userInput.value.trim();
+            if (!userMessage || sendButton.disabled) return;
+
+            statusMessageDiv.textContent = '';
+            statusMessageDiv.classList.add('hidden');
+
+            // 1. Disable input and clear text
+            userInput.value = '';
+            sendButton.disabled = true;
+
+            // 2. Append user message and update chat history
+            appendMessage('user', userMessage);
+            chatHistory.push({ role: "user", parts: [{ text: userMessage }] });
+
+            // 3. Add loading indicator
+            const loadingIndicator = createLoadingIndicator();
+            const loadingWrapper = document.createElement('div');
+            loadingWrapper.className = 'flex justify-start';
+            loadingWrapper.appendChild(loadingIndicator);
+            chatLog.appendChild(loadingWrapper);
+            chatLog.scrollTop = chatLog.scrollHeight;
+
+            try {
+                // 4. Send the chat history to the proxy server
+                const response = await fetch(API_SERVER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chatHistory })
+                });
+                
+                // 5. Check for server errors
+                if (!response.ok) {
+                    const errorJson = await response.json();
+                    throw new Error(errorJson.error || `Server returned status ${response.status}`);
+                }
+
+                const result = await response.json();
+                const fullResponse = result.text;
+                
+                // 6. Remove loading indicator and append the final message
+                chatLog.removeChild(loadingWrapper);
+                appendMessage('bot', fullResponse);
+                
+                // 7. Update chat history with the bot's response for context management
+                chatHistory.push({ role: "model", parts: [{ text: fullResponse }] });
+
+            } catch (error) {
+                console.error("Chatbot Error:", error);
+                
+                // Remove loading indicator on error
+                if (loadingWrapper.parentNode === chatLog) {
+                    chatLog.removeChild(loadingWrapper);
+                }
+                
+                statusMessageDiv.textContent = `Error: ${error.message}. Ensure your Node.js server is running on port 3001.`;
+                statusMessageDiv.classList.remove('hidden');
+
+                appendMessage('bot', `I encountered an error. Please check the console and ensure the backend server is active.`);
+
+            } finally {
+                // 8. Re-enable input
+                sendButton.disabled = false;
+                userInput.focus();
+                // Re-initialize Lucide icons
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            }
+        }
+
+        // --- Event Listeners and Initial Load ---
+
+        // Send on button click
+        sendButton.addEventListener('click', handleChat);
+
+        // Send on Enter key (preventing Shift+Enter for new line)
+        userInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                handleChat();
+            }
+        });
+
+        // Initial Welcome Message
+        document.addEventListener('DOMContentLoaded', () => {
+            appendMessage('bot', `hi i am sayonara chatbot`); 
+            
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+            
+            // Simple check to confirm the server is running
+            fetch(API_SERVER_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chatHistory: [] }) }).catch(() => {
+                statusMessageDiv.textContent = 'WARNING: Backend server (server.js) is not reachable on port 3001. Please start it with `npm start` in your terminal.';
+                statusMessageDiv.classList.remove('hidden');
+            });
+        });
+    </script>
+</body>
+</html>
