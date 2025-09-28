@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sayonara AI - Next-Gen Chatbot Experience</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        /* Glassmorphism effects */
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-dark {
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Gradient animations */
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .animated-gradient {
+            background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c, #4facfe, #00f2fe);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+        }
+
+        /* Message animations */
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message-enter {
+            animation: slideInUp 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        /* Typing indicator */
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+
+        .typing-dot {
+            animation: bounce 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        /* Scrollbar styling */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: linear-gradient(to bottom, #667eea, #764ba2);
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(to bottom, #764ba2, #667eea);
+        }
+
+        /* Glow effects */
+        .glow {
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.4),
+                        0 0 40px rgba(102, 126, 234, 0.2);
+        }
+
+        .glow-hover {
+            transition: all 0.3s ease;
+        }
+
+        .glow-hover:hover {
+            box-shadow: 0 0 30px rgba(102, 126, 234, 0.6),
+                        0 0 60px rgba(102, 126, 234, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Code block styling */
+        .code-block {
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 8px;
+            padding: 16px;
+            position: relative;
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Pulse animation for new message notification */
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        /* Shimmer effect for loading */
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            background-size: 1000px 100%;
+            animation: shimmer 2s infinite;
+        }
+
+        /* Markdown rendering styles */
+        .markdown-content h1 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; }
+        .markdown-content h2 { font-size: 1.3em; font-weight: bold; margin: 0.5em 0; }
+        .markdown-content h3 { font-size: 1.1em; font-weight: bold; margin: 0.5em 0; }
+        .markdown-content p { margin: 0.5em 0; }
+        .markdown-content ul, .markdown-content ol { margin: 0.5em 0; padding-left: 1.5em; }
+        .markdown-content li { margin: 0.25em 0; }
+        .markdown-content code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        .markdown-content pre {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 1em;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+        }
+        .markdown-content pre code {
+            background: transparent;
+            padding: 0;
+        }
+        .markdown-content strong { font-weight: bold; }
+        .markdown-content em { font-style: italic; }
+        .markdown-content blockquote {
+            border-left: 4px solid #667eea;
+            padding-left: 1em;
+            margin: 0.5em 0;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* Loading spinner */
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Error message styling */
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        /* Success message styling */
+        .success-message {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #86efac;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div id="root"></div>
+    
+    <!-- Configuration Script - This is where you set your API configuration -->
+    <script>
+        // CONFIGURATION
+        // Replace with your actual API endpoint and key
+        // For production, use environment variables or secure key management
+        window.CHATBOT_CONFIG = {
+            // Your backend API endpoint (update this to match your server)
+            API_ENDPOINT: 'http://localhost:3001/api/chat',
+            
+            // If you're using a direct Gemini API (not recommended for production due to CORS)
+            // You would need a proxy server. This is just for reference:
+            GEMINI_API_KEY: 'YOUR_GEMINI_API_KEY_HERE', // Never expose this in production!
+            
+            // LangChain configuration
+            LANGCHAIN_ENDPOINT: 'http://localhost:3001/api/langchain',
+            
+            // RAG configuration
+            RAG_ENABLED: true,
+            RAG_ENDPOINT: 'http://localhost:3001/api/rag',
+            
+            // WebSocket for streaming (optional)
+            WS_ENDPOINT: 'ws://localhost:3001',
+            
+            // Other configuration
+            MAX_TOKENS: 2048,
+            TEMPERATURE: 0.7,
+            MODEL: 'gemini-pro', // or 'gemini-pro-vision' for multimodal
+            
+            // Feature flags
+            ENABLE_STREAMING: true,
+            ENABLE_FILE_UPLOAD: true,
+            ENABLE_VOICE: false,
+            ENABLE_CODE_EXECUTION: false,
+            
+            // UI Configuration
+            SHOW_TIMESTAMPS: true,
+            ENABLE_MARKDOWN: true,
+            ENABLE_SYNTAX_HIGHLIGHTING: true,
+            
+            // Session configuration
+            SESSION_TIMEOUT: 30 * 60 * 1000, // 30 minutes
+            
+            // Debug mode
+            DEBUG: true
+        };
+
+        // Log configuration in debug mode
+        if (window.CHATBOT_CONFIG.DEBUG) {
+            console.log('Sayonara Chatbot Configuration:', {
+                ...window.CHATBOT_CONFIG,
+                GEMINI_API_KEY: '***HIDDEN***' // Hide the key in logs
+            });
+        }
+    </script>
+    
+    <!-- Main Application Script -->
+    <script type="text/babel" src="script.js"></script>
+</body>
+</html>
