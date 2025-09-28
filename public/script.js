@@ -540,8 +540,8 @@ const RightPanel = ({ isOpen, onClose }) => {
     const { isConnected } = useContext(ChatContext);
     
     return (
-        <div className={`${isOpen ? 'translate-x-0' : 'translate-x-full'} fixed lg:relative inset-y-0 right-0 w-80 glass-dark z-40 transition-transform duration-300`}>
-            <div className="h-full flex flex-col p-4">
+        <div className={`${isOpen ? 'translate-x-0' : 'translate-x-full'} fixed lg:relative inset-y-0 right-0 w-80 h-full glass-dark z-40 transition-transform duration-300 lg:translate-x-0`}>
+            <div className="h-full flex flex-col p-4 overflow-y-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold text-white">Settings</h2>
@@ -625,35 +625,6 @@ const RightPanel = ({ isOpen, onClose }) => {
                         </div>
                     </div>
                 </div>
-                
-                {/* Session Info */}
-                <div className="mb-6">
-                    <h3 className="text-sm font-semibold text-gray-400 mb-3">Session</h3>
-                    <div className="p-3 rounded-lg glass">
-                        <p className="text-xs text-gray-400 break-all">
-                            ID: {api.sessionId}
-                        </p>
-                    </div>
-                </div>
-                
-                {/* Keyboard Shortcuts */}
-                <div className="mt-auto">
-                    <h3 className="text-sm font-semibold text-gray-400 mb-3">Shortcuts</h3>
-                    <div className="space-y-2 text-xs">
-                        <div className="flex justify-between text-gray-400">
-                            <span>New Chat</span>
-                            <kbd className="px-2 py-1 rounded bg-gray-700 text-white">Ctrl+N</kbd>
-                        </div>
-                        <div className="flex justify-between text-gray-400">
-                            <span>Search</span>
-                            <kbd className="px-2 py-1 rounded bg-gray-700 text-white">Ctrl+K</kbd>
-                        </div>
-                        <div className="flex justify-between text-gray-400">
-                            <span>Send</span>
-                            <kbd className="px-2 py-1 rounded bg-gray-700 text-white">Ctrl+Enter</kbd>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     );
@@ -705,9 +676,18 @@ const Composer = ({ onSend, disabled }) => {
     };
     
     const handleKeyDown = (e) => {
-        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        // Press Enter to send message.
+        // Use Shift+Enter to insert a newline.
+        if (e.key === 'Enter') {
+            // allow Shift+Enter to create a newline
+            if (e.shiftKey) {
+                return;
+            }
             e.preventDefault();
-            handleSend();
+            // guard against disabled/loading state
+            if (!disabled && !isLoading) {
+                handleSend();
+            }
         }
     };
     
@@ -762,7 +742,7 @@ const Composer = ({ onSend, disabled }) => {
                 </div>
             )}
             
-            <div className="flex items-end space-x-2 p-4">
+            <div className="flex items-center space-x-2 p-4">
                 {/* Attachment Button */}
                 {CONFIG.ENABLE_FILE_UPLOAD && (
                     <>
@@ -775,7 +755,7 @@ const Composer = ({ onSend, disabled }) => {
                         />
                         <button 
                             onClick={() => fileInputRef.current?.click()}
-                            className="p-3 rounded-lg glass hover:bg-white/10 text-gray-400 hover:text-white transition-all"
+                            className="h-12 w-12 flex items-center justify-center rounded-lg glass hover:bg-white/10 text-gray-400 hover:text-white transition-all"
                             title="Attach file"
                         >
                             <Icon name="attachment" className="w-5 h-5" />
@@ -791,7 +771,7 @@ const Composer = ({ onSend, disabled }) => {
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="Type your message... (Use / for commands, Ctrl+Enter to send)"
-                        className="w-full px-4 py-3 rounded-lg glass bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                        className="w-full px-4 py-2 rounded-lg glass bg-white/5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none min-h-[48px] max-h-[120px]"
                         rows="1"
                         style={{ minHeight: '48px', maxHeight: '120px' }}
                         disabled={disabled || isLoading}
@@ -799,7 +779,7 @@ const Composer = ({ onSend, disabled }) => {
                 </div>
                 
                 {/* Emoji Button */}
-                <button className="p-3 rounded-lg glass hover:bg-white/10 text-gray-400 hover:text-white transition-all">
+                <button className="h-12 w-12 flex items-center justify-center rounded-lg glass hover:bg-white/10 text-gray-400 hover:text-white transition-all">
                     <Icon name="emoji" className="w-5 h-5" />
                 </button>
                 
@@ -807,7 +787,7 @@ const Composer = ({ onSend, disabled }) => {
                 <button
                     onClick={handleSend}
                     disabled={!message.trim() || disabled || isLoading}
-                    className={`p-3 rounded-lg transition-all ${
+                    className={`h-12 w-12 flex items-center justify-center rounded-lg transition-all ${
                         message.trim() && !disabled && !isLoading
                             ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 glow'
                             : 'glass text-gray-500'
@@ -1030,7 +1010,7 @@ const App = () => {
     const [conversations, setConversations] = useState([]);
     const [selectedConversation, setSelectedConversation] = useState('c1');
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [rightPanelOpen, setRightPanelOpen] = useState(false);
+    const [rightPanelOpen, setRightPanelOpen] = useState(true);
     
     useEffect(() => {
         // Load conversations
@@ -1094,7 +1074,7 @@ const App = () => {
                     {/* Settings Button */}
                     <button
                         onClick={() => setRightPanelOpen(!rightPanelOpen)}
-                        className="fixed top-4 right-4 z-50 p-2 rounded-lg glass text-white"
+                        className="fixed top-4 right-4 z-50 p-2 rounded-lg glass text-white lg:hidden"
                     >
                         <Icon name="settings" className="w-6 h-6" />
                     </button>
@@ -1120,12 +1100,11 @@ const App = () => {
                     />
                     
                     {/* Overlay for mobile */}
-                    {(sidebarOpen || rightPanelOpen) && (
+                    {sidebarOpen && (
                         <div
                             className="lg:hidden fixed inset-0 bg-black/50 z-30"
                             onClick={() => {
                                 setSidebarOpen(false);
-                                setRightPanelOpen(false);
                             }}
                         />
                     )}

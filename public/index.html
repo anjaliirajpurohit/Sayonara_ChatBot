@@ -199,7 +199,7 @@
         }
     </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-x-hidden">
     <div id="root"></div>
     
     <!-- Configuration Script - This is where you set your API configuration -->
@@ -228,7 +228,7 @@
             // Other configuration
             MAX_TOKENS: 2048,
             TEMPERATURE: 0.7,
-            MODEL: 'gemini-pro', // or 'gemini-pro-vision' for multimodal
+            MODEL: 'gemini-2.5-flash', // or 'gemini-pro-vision' for multimodal
             
             // Feature flags
             ENABLE_STREAMING: true,
